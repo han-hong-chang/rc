@@ -1,0 +1,6 @@
+Value:80
+SST: 1
+SD: 2 3 4
+Min PRB Policy Ratio: 60
+Max PRB Policy Ratio: 80
+Dedicated PRB Policy Ratio: 30

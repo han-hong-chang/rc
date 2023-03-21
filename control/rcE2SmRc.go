@@ -89,9 +89,91 @@ func (c *E2sm) SetRicControlHeader(buffer []byte, ueIdData *UEid, ricControlStyl
 	return
 }
 
+func (c *E2sm) SetRicControlMessage_slice(buffer []byte, rrmPolicy []RRM_Policy) (newBuffer []byte, err error) {
+	xapp.Logger.Info("SetRicControlMessage_slice Enter  \n")
+
+	var policyNum int32 = int32(len(rrmPolicy))
+	var memberNum []int32 = make([]int32, policyNum)
+	var allMemberNum int32 = 0
+	var memberIdx int32 = 0
+	for i, v := range rrmPolicy {
+		allMemberNum = allMemberNum + int32(len(v.member))
+		memberNum[i] = int32(len(v.member))
+	}
+
+	var plmnid [][6]byte = make([][6]byte, allMemberNum)
+	var sst [][1]byte = make([][1]byte, allMemberNum)
+	var sd [][3]byte = make([][3]byte, allMemberNum)
+
+	var min []int32 = make([]int32, policyNum)
+	var max []int32 = make([]int32, policyNum)
+	var ded []int32 = make([]int32, policyNum)
+
+	for i := 0; i < int(policyNum); i++ {
+		for j:= 0; j < int(memberNum[i]); j++ {
+			copy(plmnid[memberIdx][:], rrmPolicy[i].member[j].plmnId)
+			copy(sst[memberIdx][:], rrmPolicy[i].member[j].sst)
+			copy(sd[memberIdx][:], rrmPolicy[i].member[j].sd)
+			memberIdx = memberIdx + 1
+		}
+		min[i] = rrmPolicy[i].minPrb
+		max[i] = rrmPolicy[i].maxPrb
+		ded[i] = rrmPolicy[i].dedPrb
+	}
+
+	cptr := unsafe.Pointer(&buffer[0])
+	memberNum_ptr := unsafe.Pointer(&memberNum[0])
+	plmnid_cptr := unsafe.Pointer(&plmnid[0])
+	sst_cptr := unsafe.Pointer(&sst[0])
+	sd_cptr := unsafe.Pointer(&sd[0])
+	min_cptr := unsafe.Pointer(&min[0])
+	max_cptr := unsafe.Pointer(&max[0])
+	ded_cptr := unsafe.Pointer(&ded[0])
+
+
+	xapp.Logger.Info("buffer size:%d\n", len(buffer))
+	xapp.Logger.Info("Policy Number:%d\n", policyNum)
+	xapp.Logger.Info("Member Number:%d\n", allMemberNum)
+
+	size := C.encode_slice_level_quote(cptr, C.size_t(len(buffer)), C.int(policyNum),
+		memberNum_ptr,
+		plmnid_cptr,
+		sst_cptr,
+		sd_cptr,
+		min_cptr,
+		max_cptr,
+		ded_cptr)
+
+	/*
+	size := C.encode_slice_level_quote(buffer, C.size_t(len(buffer)), C.int(policyNum),
+		(*C.int)(unsafe.Pointer(&memberNum[0])),
+		(*(*C.char))(unsafe.Pointer(&plmnid[0][0])),
+		(*(*C.char))(unsafe.Pointer(&sst[0][0])),
+		(*(*C.char))(unsafe.Pointer(&sd[0][0])),
+		(*C.int)(unsafe.Pointer(&min[0])),
+		(*C.int)(unsafe.Pointer(&max[0])),
+		(*C.int)(unsafe.Pointer(&ded[0]))
+	)
+	*/
+
+	//size := C.encode_slice_level_quote(cptr, C.size_t(len(buffer)), SST_cptr, C.size_t(len(lSSTOutByte)), SD_cptr, C.size_t(len(lSDOutByte)),
+	//	C.long(MinVal), C.long(MaxVal), C.long(DedVal))
+
+// extern ssize_t encode_slice_level_quote(void *buffer, size_t buf_size, int policyNum, int memberNum[], char plmnId[][6], char sst[][1], char sd[][3], int min[], int max[], int ded[]);
+
+	if size < 0 {
+		return make([]byte, 0), errors.New("e2sm wrapper is unable to set RicControlMessage due to wrong or invalid input")
+	}
+	newBuffer = C.GoBytes(cptr, (C.int(size)+7)/8) //TOCHECK: if C.int(size) is returning bits not bytes to get correct size of the buffer.
+	xapp.Logger.Info("E2sm SetRicControlMessage_slice is success")
+	return
+}
+
 func (c *E2sm) SetRicControlMessage(buffer []byte, targetPrimaryCell int64, targetCell int64, nrCGIOrECGI int64, nrOrEUtraCell int64, pLMNIdentitybuf string,NRcellIdbuf []byte) (newBuffer []byte, err error) {
 	
-	xapp.Logger.Info("SetRicControlMessagei Enter  ")
+	xapp.Logger.Info("SetRicControlMessagei Enter  \n")
+
+
 	//lOutByte, err := hex.DecodeString(string(ranParameterValue))
 	 lplmnIdBuf := strings.Join(strings.Fields(pLMNIdentitybuf), "")
         //lOutByte, err := hex.DecodeString(lplmnIdBuf)
@@ -105,6 +187,15 @@ func (c *E2sm) SetRicControlMessage(buffer []byte, targetPrimaryCell int64, targ
 
 
 	cptr := unsafe.Pointer(&buffer[0])
+
+	xapp.Logger.Info("buffer size:%d\n", len(buffer))
+	xapp.Logger.Info("targetPrimaryCell:%d\n", targetPrimaryCell)
+	xapp.Logger.Info("targetCell:%d\n", targetCell)
+	xapp.Logger.Info("nrCGIOrECGI:%d\n", nrCGIOrECGI)
+	xapp.Logger.Info("nrOrEUtraCell:%d\n", nrOrEUtraCell)
+	xapp.Logger.Info("cptrRanParameterValue:%s ",cptrRanParameterValue)
+	xapp.Logger.Info("lOutByte size:%d\n", len(lOutByte))
+
 	//cptrRanParameterValue2 := unsafe.Pointer(&NRcellIdbuf[0])
 
 	/*

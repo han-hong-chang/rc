@@ -11,6 +11,10 @@ import (
 	//"encoding/hex"
 	"gerrit.o-ran-sc.org/r/ric-app/rc/protocol/grpc/ricmsgcommrpc/rc"
 	"gerrit.o-ran-sc.org/r/ric-plt/xapp-frame/pkg/xapp"
+	_ "log"
+	_"encoding/binary"
+	"encoding/hex"
+	"strings"
 )
 
 var (
@@ -118,7 +122,7 @@ func HandlegRPCRICControlMsgReq(aPtrRicControlGrpcReq *rc.RicControlGrpcReq) {
 	xapp.Logger.Debug("HandlegRPCRICControlMsgReq UEID = %v ", lUEID)
 	//Mandatory parameters validation
 	if lRicHoControlMsg.RicControlGrpcReqPtr.E2NodeID == "" ||
-		lRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID == "" ||
+		//lRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID == "" ||
 		lRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.UEID.GnbUEID.AmfUENGAPID < 0 ||
 		lRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.UEID.GnbUEID.Guami.PLMNIdentity == "" ||
 		lRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.UEID.GnbUEID.Guami.AMFRegionID == "" ||
@@ -128,8 +132,8 @@ func HandlegRPCRICControlMsgReq(aPtrRicControlGrpcReq *rc.RicControlGrpcReq) {
 		len(lRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.UEID.GnbUEID.GNBCUCPUEE1APID) == 0 ||
 		lRicHoControlMsg.RicControlGrpcReqPtr.PlmnID == "" ||
 		lRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.ControlActionId < 0 ||
-		lRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.ControlStyle < 0 ||
-		lRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.RICControlCellTypeVal < 0 ||
+		//lRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.ControlStyle < 0 ||
+		//lRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.RICControlCellTypeVal < 0 ||
 		lRicHoControlMsg.RicControlGrpcReqPtr.RICE2APHeaderData.RICRequestorID < 0 ||
 		lRicHoControlMsg.RicControlGrpcReqPtr.RICE2APHeaderData.RanFuncId < 0 {
 		xapp.Logger.Error("Mandaroty parameters missing, dont send control request ")
@@ -236,20 +240,66 @@ func (aRicHoControlMsg *RicHoControlMsg) SendRicControlRequest(aRequestSN int) (
 		}
 		fmt.Fprintf(os.Stderr, "\n")
 	}
-	var lTargetPrimaryCell int64 = RIC_CONTROL_TARGET_PRIMARY_CELL
-	var lTargetCell int64 = RIC_CONTROL_TARGET_CELL
-	var lNrCGIOrECGI int64 = RIC_CONTROL_CGI_TYPE
+	//var lTargetPrimaryCell int64 = RIC_CONTROL_TARGET_PRIMARY_CELL
+	//var lTargetCell int64 = RIC_CONTROL_TARGET_CELL
+	//var lNrCGIOrECGI int64 = RIC_CONTROL_CGI_TYPE
 
-	lNrOrEUtraCellType := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.RICControlCellTypeVal
-	lTargetCellVal := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID
+	//lNrOrEUtraCellType := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.RICControlCellTypeVal
+	//lTargetCellVal := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID
 	//lTargetCellValBuf, _:= hex.DecodeString(lTargetCellVal)
-	lTargetCellValBuf := []byte(lTargetCellVal)
+	//lTargetCellValBuf := []byte(lTargetCellVal)
 	//lNRPlmnId := []byte(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID.PlmnID)
         //lNRCellId := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID.NRCellID
 
+    var policyNum int
+    var memberNum int
+    policyNum = len(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy)
+    xapp.Logger.Info("Size of input policy group = %d", policyNum)
 
-	var lRicControlMessage []byte = make([]byte, 1024)
-	lRicControlMessageEncoded, err := e2sm.SetRicControlMessage(lRicControlMessage, lTargetPrimaryCell, lTargetCell, lNrCGIOrECGI, int64(lNrOrEUtraCellType), ueId_data.pLMNIdentitybuf, lTargetCellValBuf)
+    var rrmPolicy []RRM_Policy = make([]RRM_Policy, policyNum)
+
+    for i := 0; i < policyNum; i++ {
+    	xapp.Logger.Info("RRM Policy Group = %d", i)
+    	memberNum = len(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member)
+    	rrmPolicy[i].member = make([]RRM_Member, memberNum)
+    	for j := 0; j < memberNum; j++ {
+			// plmnBuf := strings.Join(strings.Fields(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].PlmnId), "")
+			sstBuf := strings.Join(strings.Fields(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].Sst), "")
+			sdBuf := strings.Join(strings.Fields(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].Sd), "")
+
+			// rrmPolicy[i].member[j].plmnId, _ = hex.DecodeString(plmnBuf)
+			rrmPolicy[i].member[j].sst, _ = hex.DecodeString(sstBuf)
+			rrmPolicy[i].member[j].sd, _ = hex.DecodeString(sdBuf)
+
+			rrmPolicy[i].member[j].plmnId = make([]byte, 6)
+
+		    for k := 0; k < len(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].PlmnId); k += 1 {
+		        var x uint8
+		        fmt.Sscanf(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].PlmnId[k:k+1], "%02x", &x)
+		        rrmPolicy[i].member[j].plmnId[k] = x
+		    }
+
+			xapp.Logger.Info("PLMNID = %x", []byte(rrmPolicy[i].member[j].plmnId))
+			xapp.Logger.Info("SST = %x", []byte(rrmPolicy[i].member[j].sst))
+			xapp.Logger.Info("SD = %x", []byte(rrmPolicy[i].member[j].sd))
+		}
+        rrmPolicy[i].minPrb = int32(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].MinPRB)
+        rrmPolicy[i].maxPrb = int32(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].MaxPRB)
+        rrmPolicy[i].dedPrb = int32(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].DedPRB)
+
+        xapp.Logger.Info("Min PRB Ratio = %d", rrmPolicy[i].minPrb)
+        xapp.Logger.Info("Max PRB Ratio = %d", rrmPolicy[i].maxPrb)
+        xapp.Logger.Info("Ded PRB Ratio = %d", rrmPolicy[i].dedPrb)
+
+    }
+
+    xapp.Logger.Info("Size of input policy Member = %d", policyNum)
+
+
+	var lRicControlMessage []byte = make([]byte, 2048)
+	// lRicControlMessageEncoded, err := e2sm.SetRicControlMessage(lRicControlMessage, lTargetPrimaryCell, lTargetCell, lNrCGIOrECGI, int64(lNrOrEUtraCellType), ueId_data.pLMNIdentitybuf, lTargetCellValBuf)
+	lRicControlMessageEncoded, err := e2sm.SetRicControlMessage_slice(lRicControlMessage, rrmPolicy)
+	
 	if err != nil {
 		xapp.Logger.Error("SetRicControlMessage Failed: %v, UEID:%v", err, aRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.UEID)
 		log.Printf("SetRicControlMessage Failed: %v, UEID:%v", err, aRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.UEID)

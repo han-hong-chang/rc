@@ -5,7 +5,7 @@ size_t encode_E2AP_PDU(E2AP_PDU_t* pdu, void* buffer, size_t buf_size)
 {
     asn_enc_rval_t encode_result;
     encode_result = aper_encode_to_buffer(&asn_DEF_E2AP_PDU, NULL, pdu, buffer, buf_size);
-    ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
+    //ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
     if(encode_result.encoded == -1) {
         fprintf(stderr, "Cannot encode %s: %s\n", encode_result.failed_type->name, strerror(errno));
         return -1;
@@ -22,7 +22,7 @@ E2AP_PDU_t* decode_E2AP_PDU(const void* buffer, size_t buf_size)
     if(decode_result.code == RC_OK) {
         return pdu;
     } else {
-        ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
+        //ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
         return 0;
     }
 }
@@ -188,14 +188,14 @@ RICControlAcknowledge* e2ap_decode_ric_control_acknowledge_message(void *buffer,
                     msg->ricControlOutComeSize = ricControlOutComeSize;
                 }
 	}
-		 if(pdu != NULL)
-		   	ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
+		 //if(pdu != NULL)
+		 //  	ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
 		return msg;
 	}
         }
 
-    if(pdu != NULL)
-        ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
+    //if(pdu != NULL)
+    //    ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
     return NULL;
 }
  
@@ -281,15 +281,15 @@ RICControlFailure* e2ap_decode_ric_control_failure_message(void *buffer, size_t 
 
 		}
         }
-		 if(pdu != NULL)
-                     ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
+		// if(pdu != NULL)
+                //     ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
 
                 return msg;
         }
         }
 
-        if(pdu != NULL)
-                ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
+        //if(pdu != NULL)
+        //        ASN_STRUCT_FREE(asn_DEF_E2AP_PDU, pdu);
 
         return NULL;
 }

@@ -101,3 +101,17 @@ type ControlFailureMsg struct {
         ControlOutcome       []byte
         ControlOutcomeLength int32
 }
+
+type RRM_Member struct {
+        plmnId               []byte
+        sst                  []byte
+        sd                   []byte
+}
+
+type RRM_Policy struct {
+        member               []RRM_Member
+        minPrb               int32
+        maxPrb               int32
+        dedPrb               int32
+}
+

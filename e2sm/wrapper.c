@@ -2,6 +2,69 @@
 #include "wrapper.h"
 #include "OCTET_STRING.h"
 
+ssize_t encode_slice_level_header(void *buffer, size_t buf_size, long ricControlStyleType, long ricControlActionID)
+{
+        fprintf(stderr,"e2SM wrapper function Entered\n");  
+
+        E2SM_RC_ControlHeader_t *controlHeaderIE = (E2SM_RC_ControlHeader_t *)calloc(1, sizeof(E2SM_RC_ControlHeader_t));
+        if(!controlHeaderIE)
+        {
+                fprintf(stderr, "alloc E2SM_RC_ControlHeader failed\n");
+                   return -1;
+        }
+
+        controlHeaderIE->ric_controlHeader_formats.present = E2SM_RC_ControlHeader__ric_controlHeader_formats_PR_controlHeader_Format1;
+        //E2SM_RC_ControlHeader_Format1_t  *controlHeader_Fmt1 = (E2SM_RC_ControlHeader_Format1_t *)calloc(1, sizeof(E2SM_RC_ControlHeader_Format1_t));
+        E2SM_RC_ControlHeader_Format1_t  *controlHeader_Fmt1 = NULL;
+        controlHeaderIE->ric_controlHeader_formats.choice.controlHeader_Format1 = (E2SM_RC_ControlHeader_Format1_t *)calloc(1, sizeof(E2SM_RC_ControlHeader_Format1_t));
+        controlHeader_Fmt1 = controlHeaderIE->ric_controlHeader_formats.choice.controlHeader_Format1;
+        if(!controlHeader_Fmt1)
+        {
+                fprintf(stderr, "alloc E2SM_RC_ControlHeader failed\n");
+                ASN_STRUCT_FREE(asn_DEF_E2SM_RC_ControlHeader, controlHeaderIE);
+                return -1;
+        }
+       
+        controlHeader_Fmt1->ueID.present = UEID_PR_gNB_DU_UEID;
+        controlHeader_Fmt1->ueID.choice.gNB_DU_UEID = (UEID_GNB_DU_t*)calloc(1, sizeof(UEID_GNB_DU_t));
+        controlHeader_Fmt1->ueID.choice.gNB_DU_UEID->gNB_CU_UE_F1AP_ID = 0;
+
+        // controlHeader_Fmt1->ueID.present = UEID_PR_NOTHING;
+        // controlHeader_Fmt1->ueID.choice.en_gNB_UEID = NULL;
+        // controlHeader_Fmt1->ueID.choice.eNB_UEID = NULL;
+        // controlHeader_Fmt1->ueID.choice.gNB_CU_UP_UEID = NULL;
+        // controlHeader_Fmt1->ueID.choice.gNB_DU_UEID = NULL;
+        // controlHeader_Fmt1->ueID.choice.gNB_UEID = NULL;
+        // controlHeader_Fmt1->ueID.choice.ng_eNB_DU_UEID = NULL;
+        // controlHeader_Fmt1->ueID.choice.ng_eNB_UEID = NULL;
+        
+        controlHeader_Fmt1->ric_Style_Type = ricControlStyleType;
+        controlHeader_Fmt1->ric_ControlAction_ID = ricControlActionID;
+
+        controlHeaderIE->ric_controlHeader_formats.choice.controlHeader_Format1 = controlHeader_Fmt1;
+
+
+        fprintf(stderr, "showing xer of asn_DEF_E2SM_RC_ControlHeader data\n");
+        xer_fprint(stderr, &asn_DEF_E2SM_RC_ControlHeader, controlHeaderIE);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "After xer of asn_DEF_E2SM_RC_ControlHeader data\n");
+   
+        asn_enc_rval_t encode_result;
+        encode_result = aper_encode_to_buffer(&asn_DEF_E2SM_RC_ControlHeader, NULL, controlHeaderIE, buffer, buf_size);
+
+
+        ASN_STRUCT_FREE(asn_DEF_E2SM_RC_ControlHeader, controlHeaderIE);
+        if(encode_result.encoded == -1)
+        {
+                fprintf(stderr, "Cannot encode %s: %s\n", encode_result.failed_type->name, strerror(errno));
+                return -1;
+        }
+        else
+        {
+               return encode_result.encoded;
+        }
+}
+
 ssize_t e2sm_encode_ric_control_header(void *buffer, size_t buf_size,struct uEID *inUEID,long f1AP[],size_t f1AP_len,long e1AP[],size_t e1Ap_len,long ricControlStyleType, long ricControlActionID, void* plmnId, size_t  plmnIdSize)
 {
         fprintf(stderr,"e2SM wrapper function Entered\n");  
@@ -162,7 +225,7 @@ ssize_t e2sm_encode_ric_control_header(void *buffer, size_t buf_size,struct uEID
         encode_result = aper_encode_to_buffer(&asn_DEF_E2SM_RC_ControlHeader, NULL, controlHeaderIE, buffer, buf_size);
 
 
-        //ASN_STRUCT_FREE(asn_DEF_E2SM_RC_ControlHeader, controlHeaderIE);
+        ASN_STRUCT_FREE(asn_DEF_E2SM_RC_ControlHeader, controlHeaderIE);
         if(encode_result.encoded == -1)
         {
                 fprintf(stderr, "Cannot encode %s: %s\n", encode_result.failed_type->name, strerror(errno));
@@ -793,7 +856,7 @@ ssize_t encode_slice_level_quote(void *buffer, size_t buf_size, int policyNum, v
     }
 
     // Fill in Ratio Group in Ratio List
-    RANParameter_LIST_t *rrmPolicyRatio_list = (RANParameter_ValueType_Choice_Structure_t*)calloc(1, sizeof(RANParameter_ValueType_Choice_Structure_t));
+    RANParameter_LIST_t *rrmPolicyRatio_list = (RANParameter_LIST_t*)calloc(1, sizeof(RANParameter_LIST_t));
     for(int i=0;i<policyNum;i++){
         ASN_SEQUENCE_ADD(&rrmPolicyRatio_list->list_of_ranParameter.list, rrmPolicyRatioGroup[i]);
     }
@@ -817,7 +880,7 @@ ssize_t encode_slice_level_quote(void *buffer, size_t buf_size, int policyNum, v
     else
     {
         xer_fprint(stderr, &asn_DEF_E2SM_RC_ControlMessage,e2smrcRcControlMsg);
-        //ASN_STRUCT_FREE(asn_DEF_E2SM_RC_ControlMessage, e2smrcRcControlMsg);
+        ASN_STRUCT_FREE(asn_DEF_E2SM_RC_ControlMessage, e2smrcRcControlMsg);
         return encode_result.encoded;
     }
 

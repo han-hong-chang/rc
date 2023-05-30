@@ -27,15 +27,15 @@ WORKDIR /go/src/gerrit.o-ran-sc.org/r/ric-app/rc
 COPY go.mod .
 COPY go.sum .
 COPY cmd cmd
-COPY control control
-COPY e2ap e2ap
-COPY e2sm e2sm
 COPY protocol protocol
 COPY xapp-descriptor xapp-descriptor
 RUN ls
 
 RUN go get golang.org/x/net@v0.0.0-20210614182718-04defd469f4e
 RUN go get google.golang.org/grpc@v1.39.0
+
+COPY e2ap e2ap
+COPY e2sm e2sm
 
 # "COMPILING E2AP Wrapper"
 RUN cd e2ap && \
@@ -55,6 +55,7 @@ RUN cd e2sm && \
     cp wrapper.h headers/*.h /usr/local/include/e2sm && \
     ldconfig
 
+COPY control control
 
 RUN go build ./cmd/rc.go && pwd && ls -lat
 

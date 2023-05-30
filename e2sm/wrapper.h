@@ -30,6 +30,7 @@
 #include "RANParameter-ValueType-Choice-Structure.h"
 #include "RANParameter-ValueType-Choice-List.h"
 #include "UEID.h"
+#include "UEID-GNB-DU.h"
 #include "UEID-GNB.h"
 #include "UEID-GNB-CU-F1AP-ID-List.h"
 #include "UEID-GNB-CU-CP-E1AP-ID-List.h"
@@ -76,5 +77,8 @@ extern int fillRanParaValueOctet(RANParameter_STRUCTURE_Item_t *struct_item, int
 //extern ssize_t encode_slice_level_quote(void *buffer, size_t buf_size, void* sst, size_t sst_size, void *sd, size_t sd_size, int min, int max, int ded);
  
 ssize_t encode_slice_level_quote(void *buffer, size_t buf_size, int policyNum, void *memberNum_ptr, void *plmnId_ptr, void *sst_ptr, void *sd_ptr, void *min_ptr, void *max_ptr, void *ded_ptr);
+
+ssize_t encode_slice_level_header(void *buffer, size_t buf_size, long ricControlStyleType, long ricControlActionID);
+
 
 #endif /* _WRAPPER_H_ */

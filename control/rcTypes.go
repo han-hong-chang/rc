@@ -34,6 +34,10 @@ type RicHoControlMsg struct {
 	RicControlGrpcReqPtr *rc.RicControlGrpcReq
 }
 
+type RicHoControlRrmPolicyMsg struct {
+        RicControlRrmPolicyReqPtr *rc.RICControlRequest_RRMPolicy
+}
+
 
 type UEid struct {
         amf_UE_NGAP_Id   int64

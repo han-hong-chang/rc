@@ -22,6 +22,24 @@ import (
 type E2sm struct {
 }
 
+func (c *E2sm) SetRicControlHeader_slice(buffer []byte, ricControlStyleType int64, ricControlActionID int64) (newBuffer []byte, err error) {
+
+	xapp.Logger.Info("SetRicControlHeader_slice Enter \n")
+	cptr := unsafe.Pointer(&buffer[0])
+
+	xapp.Logger.Debug("Control Style Type  %s = ", ricControlStyleType)
+	xapp.Logger.Debug("Control Action ID %s = ", ricControlActionID)
+
+	size := C.encode_slice_level_header(cptr, C.size_t(len(buffer)), (C.long)(ricControlStyleType), (C.long)(ricControlActionID))
+
+	if size < 0 {
+		return make([]byte, 0), errors.New("e2sm wrapper is unable to set EventTriggerDefinition due to wrong or invalid input")
+	}
+	newBuffer = C.GoBytes(cptr, (C.int(size)+7)/8)
+	xapp.Logger.Info("E2sm SetRicControlHeader is success")
+	return
+}
+
 func (c *E2sm) SetRicControlHeader(buffer []byte, ueIdData *UEid, ricControlStyleType int64, ricControlActionID int64) (newBuffer []byte, err error) {
 
 	xapp.Logger.Info("SetRicControlHeader Enter \n")

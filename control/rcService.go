@@ -32,8 +32,7 @@ func (aPtrSendMsgSrv *RCControlServer) SendRICControlReqServiceGrpc(aCtx context
 		xapp.Logger.Error("Received nil data from Send error rsp")
 	} else {
 		//if len(aPtrRicControlGrpcReq.E2NodeID) == 0 || len(aPtrRicControlGrpcReq.RICControlMessageData.TargetCellID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.PLMNIdentity) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFRegionID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFSetID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFPointer) == 0 || len(aPtrRicControlGrpcReq.RanName) == 0 || len(aPtrRicControlGrpcReq.PlmnID) == 0 {
-		//if len(aPtrRicControlGrpcReq.E2NodeID) == 0 || len(aPtrRicControlGrpcReq.RICControlMessageData.TargetCellID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.PLMNIdentity) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFRegionID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFSetID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFPointer) == 0 || len(aPtrRicControlGrpcReq.RanName) == 0 || len(aPtrRicControlGrpcReq.PlmnID) == 0 {
-		if len(aPtrRicControlGrpcReq.E2NodeID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.PLMNIdentity) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFRegionID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFSetID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFPointer) == 0 || len(aPtrRicControlGrpcReq.RanName) == 0 || len(aPtrRicControlGrpcReq.PlmnID) == 0 {
+		if len(aPtrRicControlGrpcReq.E2NodeID) == 0 || len(aPtrRicControlGrpcReq.RICControlMessageData.TargetCellID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.PLMNIdentity) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFRegionID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFSetID) == 0 || len(aPtrRicControlGrpcReq.RICControlHeaderData.UEID.GnbUEID.Guami.AMFPointer) == 0 || len(aPtrRicControlGrpcReq.RanName) == 0 || len(aPtrRicControlGrpcReq.PlmnID) == 0 {
 			xapp.Logger.Error("Mandatory parameters are not received send Error rsp to client,no control Request will be initiated ")
 		} else {
 			xapp.Logger.Info("GRPC Control request validated, initiate Control Request to RAN")
@@ -45,8 +44,8 @@ func (aPtrSendMsgSrv *RCControlServer) SendRICControlReqServiceGrpc(aCtx context
 			xapp.Logger.Debug("Received RIC Control Request with ControlStyle: %d", aPtrRicControlGrpcReq.RICControlHeaderData.ControlStyle)
 			xapp.Logger.Debug("Received RIC Control Request with ControlActionId: %d", aPtrRicControlGrpcReq.RICControlHeaderData.ControlActionId)
 
-			//xapp.Logger.Debug("Received RIC Control Request with CellType: %d", aPtrRicControlGrpcReq.RICControlMessageData.RICControlCellTypeVal)
-			//xapp.Logger.Debug("Received RIC Control Request with TargetCellID: %s", aPtrRicControlGrpcReq.RICControlMessageData.TargetCellID)
+			xapp.Logger.Debug("Received RIC Control Request with CellType: %d", aPtrRicControlGrpcReq.RICControlMessageData.RICControlCellTypeVal)
+			xapp.Logger.Debug("Received RIC Control Request with TargetCellID: %s", aPtrRicControlGrpcReq.RICControlMessageData.TargetCellID)
 			xapp.Logger.Debug("Received RIC Control Request with RanName: %s", aPtrRicControlGrpcReq.RanName)
 			lRicControlGrpcRsp.RspCode = GRPC_SUCCESS //int32(lGrpcRspStatusCode)
 			lRicControlGrpcRsp.Description = "Success Response"
@@ -58,4 +57,47 @@ func (aPtrSendMsgSrv *RCControlServer) SendRICControlReqServiceGrpc(aCtx context
 
 	log.Printf(" Response sent to , rsp: {Code: ", lRicControlGrpcRsp.RspCode, ", Description: ", lRicControlGrpcRsp.Description, "}")
 	return &lRicControlGrpcRsp, nil
+	
+}
+
+func (aPtrSendMsgSrv *RCControlServer) SendRRMPolicyServiceGrpc(aCtx context.Context, aPtrRicControlRequest_RRMPolicy *rc.RICControlRequest_RRMPolicy) (*rc.RicControlGrpcRsp, error) {
+
+	xapp.Logger.Info("SendRRMPolicyServiceGrpc Enter ")
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Encountered panic:", r)
+			xapp.Logger.Error("Encountered panic:", r)
+			debug.SetTraceback("all")
+			time.Sleep(100 * time.Millisecond)
+			panic(r)
+		}
+	}()
+
+	var lRicControlGrpcRsp rc.RicControlGrpcRsp
+	lRicControlGrpcRsp.RspCode = GRPC_ERROR
+	lRicControlGrpcRsp.Description = "The client specified an invalid argument. or some parameters are missing "
+	if aPtrRicControlRequest_RRMPolicy == nil {
+		xapp.Logger.Error("Received nil data from Send error rsp")
+	} else {
+		if len(aPtrRicControlRequest_RRMPolicy.RanName) == 0 || len(aPtrRicControlRequest_RRMPolicy.RrmPolicy) == 0 {
+			xapp.Logger.Error("Mandatory parameters are not received send Error rsp to client,no control Request will be initiated ")
+		} else {
+			xapp.Logger.Info("GRPC Control request validated, initiate Control Request to RAN")
+			gChan_RicControlReq_RrmPolicy_handle <- aPtrRicControlRequest_RRMPolicy
+
+			xapp.Logger.Debug("Received RIC Control Request with RanName: %s", aPtrRicControlRequest_RRMPolicy.RanName)
+			xapp.Logger.Debug("Received RIC Control Request with Policy Number: %d", len(aPtrRicControlRequest_RRMPolicy.RrmPolicy))
+
+			lRicControlGrpcRsp.RspCode = GRPC_SUCCESS //int32(lGrpcRspStatusCode)
+			lRicControlGrpcRsp.Description = "Success Response"
+			xapp.Logger.Debug("RICHOCONTROL_EVENT: Success Response sent with  RspCode:%d, Description:%s", lRicControlGrpcRsp.RspCode, lRicControlGrpcRsp.Description)
+		}
+	}
+
+	xapp.Logger.Info("RICHOCONTROL_EVENT: Response sent with  RspCode:%d, Description:%s", lRicControlGrpcRsp.RspCode, lRicControlGrpcRsp.Description)
+
+	log.Printf(" Response sent to , rsp: {Code: ", lRicControlGrpcRsp.RspCode, ", Description: ", lRicControlGrpcRsp.Description, "}")
+	return &lRicControlGrpcRsp, nil
+
 }

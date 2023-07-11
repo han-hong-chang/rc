@@ -131,6 +131,13 @@ ssize_t e2ap_encode_ric_control_request_message(void *buffer, size_t buf_size, l
     controlMsg->size = ricControlMsgSize;
     ASN_SEQUENCE_ADD(&control_request->protocolIEs.list, controlReqMsg);
 
+    // RICcontrolRequest_IEs_t *ackReq = (RICcontrolRequest_IEs_t *)calloc(1, sizeof(RICcontrolRequest_IEs_t));
+    // ackReq->criticality = Criticality_reject;
+    // ackReq->id = ProtocolIE_ID_id_RICcontrolAckRequest;
+    // ackReq->value.present = RICcontrolRequest_IEs__value_PR_RICcontrolAckRequest;
+    // ackReq->value.choice.RICcontrolAckRequest = RICcontrolAckRequest_ack;
+    // ASN_SEQUENCE_ADD(&control_request->protocolIEs.list, ackReq);
+
     fprintf(stderr, "showing xer of asn_DEF_E2AP_PDU data\n");
     xer_fprint(stderr, &asn_DEF_E2AP_PDU, init);
     fprintf(stderr, "\n");

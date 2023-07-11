@@ -8,18 +8,23 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
 	//"encoding/hex"
+	_ "encoding/binary"
+	"encoding/hex"
+	_ "log"
+	"strings"
+
 	"gerrit.o-ran-sc.org/r/ric-app/rc/protocol/grpc/ricmsgcommrpc/rc"
 	"gerrit.o-ran-sc.org/r/ric-plt/xapp-frame/pkg/xapp"
-	_ "log"
-	_"encoding/binary"
-	"encoding/hex"
-	"strings"
 )
 
 var (
-	gControlData               *Control
-	gChan_RicControlReq_handle = make(chan *rc.RicControlGrpcReq, 2000) //Make it configurable
+	gControlData                         *Control
+	gChan_RicControlReq_handle           = make(chan *rc.RicControlGrpcReq, 2000)           //Make it configurable
+	gChan_RicControlReq_RrmPolicy_handle = make(chan *rc.RICControlRequest_RRMPolicy, 2000) //Make it configurable
+	ranFuncID_RRM_policy                 = 3
+	RequestorId                          = 16
 )
 
 func NewControl() Control {
@@ -43,6 +48,7 @@ func NewControl() Control {
 
 	//To Handle RIC Control Message
 	go StartHandleControlReqRoutine()
+	go StartHandleControlRrmReqRoutine()
 
 	return Control{5,
 		make(chan *xapp.RMRParams, 1000), //Make it configurable
@@ -112,6 +118,35 @@ func StartHandleControlReqRoutine() {
 	xapp.Logger.Debug("StartHandleControlReqRoutine Done")
 }
 
+func StartHandleControlRrmReqRoutine() {
+
+	log.Printf("Starting Go Routine for Handling GRPC RIC Control RRM msg ")
+	xapp.Logger.Info("Starting Go Routine for Handling GRPC RIC Control RRM msg ")
+	for {
+		HandlegRPCRICControlMsgRrmPolicyReq(<-gChan_RicControlReq_RrmPolicy_handle)
+	}
+	xapp.Logger.Debug("StartHandleControlRrmReqRoutine Done")
+}
+
+func HandlegRPCRICControlMsgRrmPolicyReq(aPtrRicControlRrmPolicyReq *rc.RICControlRequest_RRMPolicy) {
+
+	xapp.Logger.Debug("HandlegRPCRICControlMsgRrmPolicyReq :%v", *aPtrRicControlRrmPolicyReq)
+	lRicHoControlMsg := RicHoControlRrmPolicyMsg{}
+	lRicHoControlMsg.RicControlRrmPolicyReqPtr = aPtrRicControlRrmPolicyReq
+
+	if lRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName == "" {
+		xapp.Logger.Error("Mandaroty parameters missing, dont send control request ")
+		return
+	}
+
+	lRanName := lRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName
+	xapp.Logger.Debug("HandlegRPCRICControlMsgRrmPolicyReq RanName = %s ", lRanName)
+
+	go lRicHoControlMsg.SendRicControlRrmRequest(lRicHoControlMsg.GetSequenceNumber())
+
+	return
+}
+
 func HandlegRPCRICControlMsgReq(aPtrRicControlGrpcReq *rc.RicControlGrpcReq) {
 
 	xapp.Logger.Debug("HandlegRPCRICControlMsgReq :%v", *aPtrRicControlGrpcReq)
@@ -163,7 +198,7 @@ func (aRicHoControlMsg *RicHoControlMsg) setEventRicControlCreateExpiredTimer(aS
 	gControlData.eventRicControlReqExpiredMap[aSeqNum] = false
 	gControlData.eventRicControlReqExpiredMu.Unlock()
 	controlAckTimer := xapp.Config.GetInt("controls.controlAckTimer")
-	xapp.Logger.Debug("configured controlAckTimer = %d and controlAckTimer = %d ", xapp.Config.GetInt("controls.controlAckTimer"),controlAckTimer)
+	xapp.Logger.Debug("configured controlAckTimer = %d and controlAckTimer = %d ", xapp.Config.GetInt("controls.controlAckTimer"), controlAckTimer)
 
 	timer := time.NewTimer(time.Duration(controlAckTimer) * time.Second)
 	go func(t *time.Timer) {
@@ -200,6 +235,7 @@ func (aRicHoControlMsg *RicHoControlMsg) setEventRicControlCreateExpiredTimer(aS
 		}
 	}(timer)
 }
+
 func (aRicHoControlMsg *RicHoControlMsg) SendRicControlRequest(aRequestSN int) (err error) {
 	var e2ap *E2ap
 	var e2sm *E2sm
@@ -220,11 +256,11 @@ func (aRicHoControlMsg *RicHoControlMsg) SendRicControlRequest(aRequestSN int) (
 		ueId_data)
 	ueId_data.amf_UE_NGAP_Id = lUEID.GnbUEID.AmfUENGAPID
 	ueId_data.pLMNIdentitybuf = lUEID.GnbUEID.Guami.PLMNIdentity
-        ueId_data.aMFRegionIDbuf = lUEID.GnbUEID.Guami.AMFRegionID
-        ueId_data.aMFSetIDbuf = lUEID.GnbUEID.Guami.AMFSetID
-        ueId_data.aMFPointerbuf = lUEID.GnbUEID.Guami.AMFPointer
-        ueId_data.F1AP_id = lUEID.GnbUEID.GNBCUUEF1APID
-        ueId_data.E1AP_id = lUEID.GnbUEID.GNBCUCPUEE1APID
+	ueId_data.aMFRegionIDbuf = lUEID.GnbUEID.Guami.AMFRegionID
+	ueId_data.aMFSetIDbuf = lUEID.GnbUEID.Guami.AMFSetID
+	ueId_data.aMFPointerbuf = lUEID.GnbUEID.Guami.AMFPointer
+	ueId_data.F1AP_id = lUEID.GnbUEID.GNBCUUEF1APID
+	ueId_data.E1AP_id = lUEID.GnbUEID.GNBCUCPUEE1APID
 
 	var lRicControlHeader []byte = make([]byte, 1024) //Check the Size
 	lRicControlHeaderEncoded, err := e2sm.SetRicControlHeader(lRicControlHeader, &ueId_data, lRicControlStyleType, lRicControlActionID)
@@ -240,66 +276,19 @@ func (aRicHoControlMsg *RicHoControlMsg) SendRicControlRequest(aRequestSN int) (
 		}
 		fmt.Fprintf(os.Stderr, "\n")
 	}
-	//var lTargetPrimaryCell int64 = RIC_CONTROL_TARGET_PRIMARY_CELL
-	//var lTargetCell int64 = RIC_CONTROL_TARGET_CELL
-	//var lNrCGIOrECGI int64 = RIC_CONTROL_CGI_TYPE
+	var lTargetPrimaryCell int64 = RIC_CONTROL_TARGET_PRIMARY_CELL
+	var lTargetCell int64 = RIC_CONTROL_TARGET_CELL
+	var lNrCGIOrECGI int64 = RIC_CONTROL_CGI_TYPE
 
-	//lNrOrEUtraCellType := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.RICControlCellTypeVal
-	//lTargetCellVal := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID
+	lNrOrEUtraCellType := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.RICControlCellTypeVal
+	lTargetCellVal := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID
 	//lTargetCellValBuf, _:= hex.DecodeString(lTargetCellVal)
-	//lTargetCellValBuf := []byte(lTargetCellVal)
+	lTargetCellValBuf := []byte(lTargetCellVal)
 	//lNRPlmnId := []byte(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID.PlmnID)
-        //lNRCellId := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID.NRCellID
+	//lNRCellId := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.TargetCellID.NRCellID
 
-    var policyNum int
-    var memberNum int
-    policyNum = len(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy)
-    xapp.Logger.Info("Size of input policy group = %d", policyNum)
-
-    var rrmPolicy []RRM_Policy = make([]RRM_Policy, policyNum)
-
-    for i := 0; i < policyNum; i++ {
-    	xapp.Logger.Info("RRM Policy Group = %d", i)
-    	memberNum = len(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member)
-    	rrmPolicy[i].member = make([]RRM_Member, memberNum)
-    	for j := 0; j < memberNum; j++ {
-			// plmnBuf := strings.Join(strings.Fields(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].PlmnId), "")
-			sstBuf := strings.Join(strings.Fields(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].Sst), "")
-			sdBuf := strings.Join(strings.Fields(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].Sd), "")
-
-			// rrmPolicy[i].member[j].plmnId, _ = hex.DecodeString(plmnBuf)
-			rrmPolicy[i].member[j].sst, _ = hex.DecodeString(sstBuf)
-			rrmPolicy[i].member[j].sd, _ = hex.DecodeString(sdBuf)
-
-			rrmPolicy[i].member[j].plmnId = make([]byte, 6)
-
-		    for k := 0; k < len(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].PlmnId); k += 1 {
-		        var x uint8
-		        fmt.Sscanf(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].Member[j].PlmnId[k:k+1], "%02x", &x)
-		        rrmPolicy[i].member[j].plmnId[k] = x
-		    }
-
-			xapp.Logger.Info("PLMNID = %x", []byte(rrmPolicy[i].member[j].plmnId))
-			xapp.Logger.Info("SST = %x", []byte(rrmPolicy[i].member[j].sst))
-			xapp.Logger.Info("SD = %x", []byte(rrmPolicy[i].member[j].sd))
-		}
-        rrmPolicy[i].minPrb = int32(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].MinPRB)
-        rrmPolicy[i].maxPrb = int32(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].MaxPRB)
-        rrmPolicy[i].dedPrb = int32(aRicHoControlMsg.RicControlGrpcReqPtr.RICControlMessageData.Policy[i].DedPRB)
-
-        xapp.Logger.Info("Min PRB Ratio = %d", rrmPolicy[i].minPrb)
-        xapp.Logger.Info("Max PRB Ratio = %d", rrmPolicy[i].maxPrb)
-        xapp.Logger.Info("Ded PRB Ratio = %d", rrmPolicy[i].dedPrb)
-
-    }
-
-    xapp.Logger.Info("Size of input policy Member = %d", policyNum)
-
-
-	var lRicControlMessage []byte = make([]byte, 2048)
-	// lRicControlMessageEncoded, err := e2sm.SetRicControlMessage(lRicControlMessage, lTargetPrimaryCell, lTargetCell, lNrCGIOrECGI, int64(lNrOrEUtraCellType), ueId_data.pLMNIdentitybuf, lTargetCellValBuf)
-	lRicControlMessageEncoded, err := e2sm.SetRicControlMessage_slice(lRicControlMessage, rrmPolicy)
-	
+	var lRicControlMessage []byte = make([]byte, 1024)
+	lRicControlMessageEncoded, err := e2sm.SetRicControlMessage(lRicControlMessage, lTargetPrimaryCell, lTargetCell, lNrCGIOrECGI, int64(lNrOrEUtraCellType), ueId_data.pLMNIdentitybuf, lTargetCellValBuf)
 	if err != nil {
 		xapp.Logger.Error("SetRicControlMessage Failed: %v, UEID:%v", err, aRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.UEID)
 		log.Printf("SetRicControlMessage Failed: %v, UEID:%v", err, aRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.UEID)
@@ -345,8 +334,8 @@ func (aRicHoControlMsg *RicHoControlMsg) SendRicControlRequest(aRequestSN int) (
 	xapp.Logger.Debug("The RIC Control RMR message to be sent is with MsgType:%d  SubId=%d, lParams.Meid: %v, UEID: %v", lParams.Mtype, lParams.SubId, lParams.Meid, lUEID)
 
 	xapp.Logger.Debug("Sending RIC Control message to RanName: %s, UEID: %v  ", aRicHoControlMsg.RicControlGrpcReqPtr.RanName, lUEID)
-	
-	xapp.Logger.Info("lParams %v ",lParams)
+
+	xapp.Logger.Info("lParams %v ", lParams)
 	err = gControlData.rmrSend(lParams)
 	if err != nil {
 		xapp.Logger.Error("Failed to send RIC_CONTROL_REQ: %v", err)
@@ -362,46 +351,238 @@ func (aRicHoControlMsg *RicHoControlMsg) SendRicControlRequest(aRequestSN int) (
 	return nil
 }
 
+func (aRicHoControlMsg *RicHoControlRrmPolicyMsg) GetSequenceNumber() int {
+
+	//Incrementing the RIC Requestor Instance Id to make the request unique and traceable.
+	gControlData.eventRicControlReqExpiredMu.Lock()
+	gControlData.ricRequestInstanceID = gControlData.ricRequestInstanceID + 1
+	gControlData.eventRicControlReqExpiredMu.Unlock()
+
+	return gControlData.ricRequestInstanceID
+}
+
+func (aRicHoControlMsg *RicHoControlRrmPolicyMsg) setEventRicControlCreateExpiredTimer(aSeqNum int) {
+
+	gControlData.eventRicControlReqExpiredMu.Lock()
+	gControlData.eventRicControlReqExpiredMap[aSeqNum] = false
+	gControlData.eventRicControlReqExpiredMu.Unlock()
+	controlAckTimer := xapp.Config.GetInt("controls.controlAckTimer")
+	xapp.Logger.Debug("configured controlAckTimer = %d and controlAckTimer = %d ", xapp.Config.GetInt("controls.controlAckTimer"), controlAckTimer)
+
+	timer := time.NewTimer(time.Duration(controlAckTimer) * time.Second)
+	go func(t *time.Timer) {
+		defer t.Stop()
+		xapp.Logger.Debug("RIC_CONTROL_REQ[%s]: Waiting for RIC_CONTROL_RESP...", aSeqNum)
+		log.Printf("RIC_CONTROL_REQ[%s]: Waiting for RIC_CONTROL_RESP...", aSeqNum)
+		for {
+			select {
+			case <-t.C:
+				gControlData.eventRicControlReqExpiredMu.Lock()
+				isResponsed := gControlData.eventRicControlReqExpiredMap[aSeqNum]
+				delete(gControlData.eventRicControlReqExpiredMap, aSeqNum)
+				gControlData.eventRicControlReqExpiredMu.Unlock()
+				if !isResponsed {
+					xapp.Logger.Debug("RIC_CONTROL_REQ[%s]: RIC Event Create Timer experied!", aSeqNum)
+					log.Printf("RIC_CONTROL_REQ[%s]: RIC Event Create Timer experied!", aSeqNum)
+					//Send ErrorIndication message on Timeout
+					return
+				}
+			default:
+				gControlData.eventRicControlReqExpiredMu.Lock()
+				flag := gControlData.eventRicControlReqExpiredMap[aSeqNum]
+				if flag {
+					delete(gControlData.eventRicControlReqExpiredMap, aSeqNum)
+					gControlData.eventRicControlReqExpiredMu.Unlock()
+					xapp.Logger.Debug("RIC_CONTROL_REQ[%s]: RIC Event Create Timer canceled!", aSeqNum)
+					log.Printf("RIC_CONTROL_REQ[%s]: RIC Event Create Timer canceled!", aSeqNum)
+					return
+				} else {
+					gControlData.eventRicControlReqExpiredMu.Unlock()
+				}
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}(timer)
+}
+
+func (aRicHoControlMsg *RicHoControlRrmPolicyMsg) SendRicControlRrmRequest(aRequestSN int) (err error) {
+	var e2ap *E2ap
+	var e2sm *E2sm
+
+	if aRicHoControlMsg.RicControlRrmPolicyReqPtr == nil {
+		return err
+	}
+
+	xapp.Logger.Info("SendRicControlRrmRequest Enter for RanName = %s", aRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName)
+
+	var lRicControlStyleType int64 = 2
+	var lRicControlActionID int64 = 6
+	// lUEID := aRicHoControlMsg.RicControlGrpcReqPtr.RICControlHeaderData.UEID
+
+	var lRicControlHeader []byte = make([]byte, 1024) //Check the Size
+	lRicControlHeaderEncoded, err := e2sm.SetRicControlHeader_slice(lRicControlHeader, lRicControlStyleType, lRicControlActionID)
+	if err != nil {
+		xapp.Logger.Error("SetRicControlHeader_slice Failed: %v, ranName:%v", err, aRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName)
+		return err
+	} else {
+		xapp.Logger.Info("SetRicControlHeader is success: %x", lRicControlHeaderEncoded)
+		fmt.Fprintf(os.Stderr, "Encoded RIC Control Header PDU:\n")
+		for i := 0; i < len(lRicControlHeaderEncoded); i++ {
+			fmt.Fprintf(os.Stderr, " %02x", lRicControlHeaderEncoded[i])
+		}
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
+	var policyNum int
+	var memberNum int
+	policyNum = len(aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy)
+	// xapp.Logger.Info("Size of input policy group = %d", policyNum)
+
+	var rrmPolicy []RRM_Policy = make([]RRM_Policy, policyNum)
+
+	for i := 0; i < policyNum; i++ {
+		// xapp.Logger.Info("RRM Policy Group = %d", i)
+		memberNum = len(aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].Member)
+		rrmPolicy[i].member = make([]RRM_Member, memberNum)
+		for j := 0; j < memberNum; j++ {
+			sstBuf := strings.Join(strings.Fields(aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].Member[j].Sst), "")
+			sdBuf := strings.Join(strings.Fields(aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].Member[j].Sd), "")
+
+			rrmPolicy[i].member[j].sst, _ = hex.DecodeString(sstBuf)
+			rrmPolicy[i].member[j].sd, _ = hex.DecodeString(sdBuf)
+
+			rrmPolicy[i].member[j].plmnId = make([]byte, 6)
+
+			for k := 0; k < len(aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].Member[j].PlmnId); k += 1 {
+				var x uint8
+				fmt.Sscanf(aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].Member[j].PlmnId[k:k+1], "%02x", &x)
+				rrmPolicy[i].member[j].plmnId[k] = x
+			}
+
+			// xapp.Logger.Info("PLMNID = %x", []byte(rrmPolicy[i].member[j].plmnId))
+			// xapp.Logger.Info("SST = %x", []byte(rrmPolicy[i].member[j].sst))
+			// xapp.Logger.Info("SD = %x", []byte(rrmPolicy[i].member[j].sd))
+		}
+		rrmPolicy[i].minPrb = int32(aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].MinPRB)
+		rrmPolicy[i].maxPrb = int32(aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].MaxPRB)
+		rrmPolicy[i].dedPrb = int32(aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].DedPRB)
+
+		// xapp.Logger.Info("Min PRB Ratio = %d", rrmPolicy[i].minPrb)
+		// xapp.Logger.Info("Max PRB Ratio = %d", rrmPolicy[i].maxPrb)
+		// xapp.Logger.Info("Ded PRB Ratio = %d", rrmPolicy[i].dedPrb)
+	}
+
+	xapp.Logger.Info("Size of input policy Member = %d", policyNum)
+
+	for i := 0; i < policyNum; i++ {
+		xapp.Logger.Info("Policy %v: PLMNID = %v, SST = %v, SD = %v, MinPRB = %v, MaxPRB = %v, DedPRB = %v",
+			i,
+			aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].Member[0].PlmnId,
+			aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].Member[0].Sst,
+			aRicHoControlMsg.RicControlRrmPolicyReqPtr.RrmPolicy[i].Member[0].Sd,
+			rrmPolicy[i].minPrb, rrmPolicy[i].maxPrb, rrmPolicy[i].dedPrb)
+	}
+
+	var lRicControlMessage []byte = make([]byte, 2048)
+	// lRicControlMessageEncoded, err := e2sm.SetRicControlMessage(lRicControlMessage, lTargetPrimaryCell, lTargetCell, lNrCGIOrECGI, int64(lNrOrEUtraCellType), ueId_data.pLMNIdentitybuf, lTargetCellValBuf)
+	lRicControlMessageEncoded, err := e2sm.SetRicControlMessage_slice(lRicControlMessage, rrmPolicy)
+
+	if err != nil {
+		xapp.Logger.Error("SetRicControlMessage Failed: %v, ranName:%v", err, aRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName)
+		return err
+	} else {
+		xapp.Logger.Debug("SetRicControlMessage is success: %x", lRicControlMessageEncoded)
+		fmt.Fprintf(os.Stderr, "Encoded RIC Control Message PDU:\n")
+		for i := 0; i < len(lRicControlMessageEncoded); i++ {
+			fmt.Fprintf(os.Stderr, " %02x", lRicControlMessageEncoded[i])
+		}
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
+	lParams := &xapp.RMRParams{}
+	lParams.Mtype = 12040 //RIC_CONTROL_REQ
+	lParams.SubId = -1
+
+	var lRequestorId uint16 = uint16(RequestorId)
+	var lFuncId uint16 = uint16(ranFuncID_RRM_policy)
+
+	lParams.Payload = make([]byte, 2048)
+	lParams.Payload, err = e2ap.SetRicControlRequestPayload(lParams.Payload, lRequestorId, uint16(aRequestSN), lFuncId,
+		lRicControlHeaderEncoded, lRicControlMessageEncoded)
+	RequestorId = RequestorId + 1
+	if err != nil {
+		xapp.Logger.Error("SetRicControlMessage Failed: %v, ranName:%v", err, aRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName)
+		return err
+	} else {
+		xapp.Logger.Debug("Encoding RicControlRequestPayload is success. ranName: %s, Payload: %x", aRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName, lParams.Payload)
+		fmt.Fprintf(os.Stderr, "Encoded RIC Control Req PDU:\n")
+		for i := 0; i < len(lParams.Payload); i++ {
+			fmt.Fprintf(os.Stderr, " %02x", lParams.Payload[i])
+		}
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+	lParams.PayloadLen = len(lParams.Payload)
+	valEnbId := "0"
+	valRanName := aRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName
+	valPlmnId := "0"
+	lParams.Meid = &xapp.RMRMeid{PlmnID: valPlmnId, EnbID: valEnbId, RanName: valRanName}
+
+	xapp.Logger.Debug("The RIC Control RMR message to be sent is with MsgType:%d  SubId=%d, lParams.Meid: %v", lParams.Mtype, lParams.SubId, lParams.Meid)
+
+	xapp.Logger.Debug("Sending RIC Control message to RanName: %s", aRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName)
+
+	xapp.Logger.Info("lParams %v ", lParams)
+	err = gControlData.rmrSend(lParams)
+	if err != nil {
+		xapp.Logger.Error("Failed to send RIC_CONTROL_REQ: %v", err)
+		log.Printf("Failed to send RIC_CONTROL_REQ: %v", err)
+		xapp.Logger.Info("Failed to send RIC_CONTROL_REQ: %v", err)
+		return err
+	}
+
+	xapp.Logger.Info("Sending RIC Control message to RanName: %s Success", aRicHoControlMsg.RicControlRrmPolicyReqPtr.RanName)
+	//Start Timer Operation.
+	aRicHoControlMsg.setEventRicControlCreateExpiredTimer(aRequestSN) //TODO check if this is required as we are not expecting Control ACK
+
+	return nil
+}
+
 func HandleControlResponse(params *xapp.RMRParams) (err error) {
 
 	var e2ap *E2ap
-        var e2sm *E2sm
+	var e2sm *E2sm
 	xapp.Logger.Debug("The SubId in RIC_CONTROL_RESP is %d", params.SubId)
 	log.Printf("The SubId in RIC_CONTROL_RESP is %d", params.SubId)
-
-
 
 	//Decode the RIC Control Ack message
 	controlAck, err := e2ap.GetControlAckMsg(params.Payload)
 	if err != nil {
 		xapp.Logger.Error("Failed to decode RIC Control Ack: %v", err)
-                log.Println("Failed to decode RIC Control Ack: %v", err)
-                return
+		log.Println("Failed to decode RIC Control Ack: %v", err)
+		return
 	}
 	log.Println("E2ap RIC RIC Control Ack message decoded \n")
 	xapp.Logger.Info("E2ap RIC RIC Control Ack message decoded \n")
 	gControlData.eventRicControlReqExpiredMu.Lock()
-        _,ok := gControlData.eventRicControlReqExpiredMap[int(controlAck.InstanceId)]
-        if !ok {
-                gControlData.eventRicControlReqExpiredMu.Unlock()
-                xapp.Logger.Debug("RIC_CONTROL_REQ has been deleted!")
-                log.Printf("RIC_CONTROL_REQ has been deleted!")
-                return nil
-        } else {
-                gControlData.eventRicControlReqExpiredMap[int(controlAck.InstanceId)] = true
+	_, ok := gControlData.eventRicControlReqExpiredMap[int(controlAck.InstanceId)]
+	if !ok {
 		gControlData.eventRicControlReqExpiredMu.Unlock()
-        }
+		xapp.Logger.Debug("RIC_CONTROL_REQ has been deleted!")
+		log.Printf("RIC_CONTROL_REQ has been deleted!")
+		return nil
+	} else {
+		gControlData.eventRicControlReqExpiredMap[int(controlAck.InstanceId)] = true
+		gControlData.eventRicControlReqExpiredMu.Unlock()
+	}
 
 	controlOutcome, err := e2sm.GetControlOutcome(controlAck.ControlOutcome)
-        if err != nil {
+	if err != nil {
 		xapp.Logger.Error("Failed to decode RIC Control Outcome: %v", err)
-                log.Println("Failed to decode RIC Control Outcome: %v", err)
-                return
-        }
-        log.Println("E2SM-RC RIC Control Outcome  decoded \n",controlOutcome)
-        xapp.Logger.Info("E2SM-RC RIC Control Outcome  decoded \n",controlOutcome)
-
-
+		log.Println("Failed to decode RIC Control Outcome: %v", err)
+		return
+	}
+	log.Println("E2SM-RC RIC Control Outcome  decoded \n", controlOutcome)
+	xapp.Logger.Info("E2SM-RC RIC Control Outcome  decoded \n", controlOutcome)
 
 	return nil
 }
@@ -415,23 +596,23 @@ func HandleControlFailure(params *xapp.RMRParams) (err error) {
 
 	controlAck, err := e2ap.GetControlFailureMsg(params.Payload)
 	if err != nil {
-                xapp.Logger.Debug("Failed to decode RIC Control message: %v", err)
-                log.Println("Failed to decode RIC Control Ack: %v", err)
-                return
-        }
-        log.Println("E2ap RIC  Control Ack message decoded \n")
-        xapp.Logger.Debug("E2ap RIC Control Ack message decoded \n")
+		xapp.Logger.Debug("Failed to decode RIC Control message: %v", err)
+		log.Println("Failed to decode RIC Control Ack: %v", err)
+		return
+	}
+	log.Println("E2ap RIC  Control Ack message decoded \n")
+	xapp.Logger.Debug("E2ap RIC Control Ack message decoded \n")
 
-        gControlData.eventRicControlReqExpiredMu.Lock()
-        _, ok := gControlData.eventRicControlReqExpiredMap[int(controlAck.InstanceId)]
-        if !ok {
-                gControlData.eventRicControlReqExpiredMu.Unlock()
-                xapp.Logger.Debug("RIC_CONTROL_REQ has been deleted!")
-                log.Printf("RIC_CONTROL_REQ has been deleted!")
-                return nil
-        } else {
-                gControlData.eventRicControlReqExpiredMap[int(controlAck.InstanceId)] = true
-                gControlData.eventRicControlReqExpiredMu.Unlock()
-        }
+	gControlData.eventRicControlReqExpiredMu.Lock()
+	_, ok := gControlData.eventRicControlReqExpiredMap[int(controlAck.InstanceId)]
+	if !ok {
+		gControlData.eventRicControlReqExpiredMu.Unlock()
+		xapp.Logger.Debug("RIC_CONTROL_REQ has been deleted!")
+		log.Printf("RIC_CONTROL_REQ has been deleted!")
+		return nil
+	} else {
+		gControlData.eventRicControlReqExpiredMap[int(controlAck.InstanceId)] = true
+		gControlData.eventRicControlReqExpiredMu.Unlock()
+	}
 	return nil
 }

@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "asn_sequence_of.h": "c",
+        "constr_sequence.h": "c",
+        "asn_application.h": "c"
+    }
+}

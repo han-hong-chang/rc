@@ -792,13 +792,11 @@ ssize_t encode_slice_level_quote(void *buffer, size_t buf_size, int policyNum, v
         ASN_SEQUENCE_ADD(&(nssai_struct[i][0]).sequence_of_ranParameters->list, sst_struct_item[i]);
         ASN_SEQUENCE_ADD(&(nssai_struct[i][0]).sequence_of_ranParameters->list, sd_struct_item[i]);
         plmnID_item[i] = (RANParameter_STRUCTURE_Item_t*)calloc(1, sizeof(RANParameter_STRUCTURE_Item_t));
-
         fillRanParaValueOctet(plmnID_item[i], 7, plmnId[i], 6);
     }
 
     // Fill S-NSSAI struct, plmnID in RRM Policy
     RANParameter_STRUCTURE_t **rrmPolicyMember = (RANParameter_STRUCTURE_t**)calloc(allMemberNum, sizeof(RANParameter_STRUCTURE_t*)); 
-    //RANParameter_STRUCTURE_t *rrmPolicyMember = (RANParameter_STRUCTURE_t*)calloc(1, sizeof(RANParameter_STRUCTURE_t));
 
     RANParameter_STRUCTURE_Item_t **rrmPolicyMember_item = (RANParameter_STRUCTURE_Item_t **)calloc(allMemberNum,sizeof(RANParameter_STRUCTURE_Item_t*));
     for(int i=0;i<allMemberNum;i++){
@@ -810,8 +808,7 @@ ssize_t encode_slice_level_quote(void *buffer, size_t buf_size, int policyNum, v
         ASN_SEQUENCE_ADD(&(rrmPolicyMember[i][0]).sequence_of_ranParameters->list, rrmPolicyMember_item[i]);
     }
 
-    // Fill in for RIC Test to add a layer
-
+    // Fill RRM Policy Member
     RANParameter_STRUCTURE_Item_t **rrmPolicyMember_list_item = (RANParameter_STRUCTURE_Item_t**)calloc(allMemberNum, sizeof(RANParameter_STRUCTURE_Item_t*));
     RANParameter_STRUCTURE_t **rrmPolicyMember_struct = (RANParameter_STRUCTURE_t**)calloc(allMemberNum, sizeof(RANParameter_STRUCTURE_t*));
     for(int i=0;i<allMemberNum;i++){
@@ -870,7 +867,7 @@ ssize_t encode_slice_level_quote(void *buffer, size_t buf_size, int policyNum, v
         ASN_SEQUENCE_ADD(&(rrmPolicyRatioGroup[i][0]).sequence_of_ranParameters->list, ded_struct_item[i]);
     }
 
-    // Fill in for RIC Test to add a layer
+    // Fill RRM Policy Ratio Group
 
     RANParameter_STRUCTURE_Item_t **rrmPolicyRatioGroup_item = (RANParameter_STRUCTURE_Item_t**)calloc(policyNum, sizeof(RANParameter_STRUCTURE_Item_t*));
     RANParameter_STRUCTURE_t **rrmPolicyRatio_struct = (RANParameter_STRUCTURE_t**)calloc(policyNum, sizeof(RANParameter_STRUCTURE_t*));
@@ -889,7 +886,7 @@ ssize_t encode_slice_level_quote(void *buffer, size_t buf_size, int policyNum, v
         ASN_SEQUENCE_ADD(&rrmPolicyRatio_list->list_of_ranParameter.list, rrmPolicyRatio_struct[i]);
     }
     
-    // Fill in format1 item
+    // FRRM Policy Ratio List
   E2SM_RC_ControlMessage_Format1_Item_t *format1item = (E2SM_RC_ControlMessage_Format1_Item_t *) calloc(1,sizeof(
                                                                              E2SM_RC_ControlMessage_Format1_Item_t));
   fillListInformat1Item(format1item, 1, rrmPolicyRatio_list);
